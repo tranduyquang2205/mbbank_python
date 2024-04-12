@@ -10,7 +10,9 @@ app = FastAPI()
 from mbbank import MBBANK
 
 mbbank = MBBANK()
-
+@app.get("/")
+def read_root():
+    return {"Hello": "World"}
 
 class LoginDetails(BaseModel):
     username: str
