@@ -151,7 +151,7 @@ class MBBANK:
         response_json = json.loads(response.text)
         return response_json["imageString"]
 
-    def getTransactionHistory(self, fromDate,toDate, session):
+    def getTransactionHistory(self, fromDate,toDate, session,account_number):
         url = 'https://online.mbbank.com.vn/api/retail-transactionms/transactionms/get-account-transaction-history'
         headers = {
             'Content-Type': 'application/json',
@@ -161,7 +161,7 @@ class MBBANK:
             'X-Request-Id': session["refNo"],
         }
         data = {
-            "accountNo": session["cust"]["chrgAcctCd"],
+            "accountNo": account_number,
             "fromDate": fromDate,
             "toDate": toDate,
             "sessionId": session["sessionId"],

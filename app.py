@@ -39,7 +39,7 @@ class Transactions(BaseModel):
 @app.post('/get_transactions', tags=["get_transactions"])
 def get_transactions_api(input: Transactions):
         session_raw = mbbank.handleLogin(input.username, input.password)
-        history = mbbank.getTransactionHistory(input.from_date,input.to_date,json.loads(session_raw))
+        history = mbbank.getTransactionHistory(input.from_date,input.to_date,json.loads(session_raw),input.account_number)
         return json.loads(history)
 
 
