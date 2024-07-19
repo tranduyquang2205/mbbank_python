@@ -140,7 +140,7 @@ class MBBANK:
                 result = response.text
             return result
     def encrypt_data(self,data):
-        url = "https://encrypt-mbbank.onrender.com/encrypt"
+        url = "https://mbcrypt.pay2world.vip/encrypt"
         payload = json.dumps(data)
         headers = {
         'Content-Type': 'application/json'
@@ -281,7 +281,9 @@ class MBBANK:
             "refNo": self.sessionId["refNo"],
             "deviceIdCommon": self.sessionId["cust"]["deviceId"]
         }
+        print(data)
         response = self.curlPost(url, headers=headers, data=data)
+        print(response)
         if 'result' in response and 'responseCode' in response['result'] and response['result']['responseCode'] == "00":
             return {'code':200,'success': True, 'message': 'Thành công',
                             'data':{
@@ -291,6 +293,7 @@ class MBBANK:
             return  {
                     "success": False,
                     "code": 503,
+                    "param":data,
                     "message": "Service Unavailable!"
                 }
 
