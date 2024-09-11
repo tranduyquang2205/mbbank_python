@@ -42,7 +42,7 @@ class TLSAdapter(HTTPAdapter):
         kwargs['ssl_context'] = self.ssl_context
         return super(TLSAdapter, self).proxy_manager_for(*args, **kwargs)
 
-def get_legacy_session(verify_ssl=True):
+def get_legacy_session(verify_ssl=False):
     """
     Create and return a session that uses TLSAdapter for secure connections to legacy servers.
 
