@@ -5,9 +5,42 @@ import time
 import os
 import hashlib
 from datetime import datetime
+import random
+from Cryptodome.PublicKey import RSA
+from Cryptodome.Cipher import AES,PKCS1_v1_5,PKCS1_OAEP
+from Cryptodome.Random import get_random_bytes
+import base64
+import string
+from Cryptodome.Util import Counter
+from bypass_ssl_v3 import get_legacy_session
+from urllib.parse import quote
+import socket
+import urllib
+import ssl
+import urllib3
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+session_requests = get_legacy_session()
 
 class MBBANK:
-    def __init__(self,username, password, account_number):
+    def __init__(self,username, password, account_number, proxy_list=None):
+        self.proxy_list = proxy_list
+        if self.proxy_list:
+            try:
+                self.proxy_info = self.proxy_list.pop(0)
+                proxy_host, proxy_port, username_proxy, password_proxy = self.proxy_info.split(':')
+                self.proxies = {
+                    'http': f'http://{quote(username_proxy)}:{quote(password_proxy)}@{proxy_host}:{proxy_port}',
+                    'https': f'http://{quote(username_proxy)}:{quote(password_proxy)}@{proxy_host}:{proxy_port}'
+                }
+            except ValueError:
+                self.proxies = None 
+            except Exception as e:
+                self.proxies = None
+        else:
+            self.proxies = None
+        
         self.password = password
         self.username = username
         self.account_number = account_number
@@ -133,7 +166,7 @@ class MBBANK:
                 "Content-Type": "application/json; charset=UTF-8",
                 'app': "MB_WEB",
                 }
-            response = self.session.post(url, headers=headers, data=json.dumps(data))
+            response = self.session.post(url, headers=headers, data=json.dumps(data), proxies=self.proxies, verify=False)
             try:
                 result = response.json()
             except:
@@ -146,7 +179,7 @@ class MBBANK:
         'Content-Type': 'application/json'
         }
 
-        response = requests.request("POST", url, headers=headers, data=payload)
+        response = requests.request("POST", url, headers=headers, data=payload, proxies=self.proxies, verify=False)
 
         try:
             return response.json()
@@ -192,30 +225,6 @@ class MBBANK:
             return {'code':404,'success': False, 'message': 'account_number not found!'} 
         else: 
             return {'code':520 ,'success': False, 'message': 'Unknown Error!'} 
-    def createTaskCaptcha1(self, base64_img):
-            url = "https://api.anti-captcha.com/createTask"
-            payload = json.dumps({
-            "clientKey": "f3a44e66302c61ffec07c80f4732baf3",
-            "task": {
-                "type": "ImageToTextTask",
-                "body": base64_img,
-                "phrase": False,
-                "case": False,
-                "numeric": 0,
-                "math": False,
-                "minLength": 0,
-                "maxLength": 0
-            },
-            "softId": 0
-            })
-            headers = {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-            }
-
-            response = requests.request("POST", url, headers=headers, data=payload)
-            print(response.text)
-            return(response.text)
     def createTaskCaptcha(self, base64_img):
         url = 'http://103.72.96.214:8277/api/captcha/mbbank'
         payload = json.dumps({
@@ -224,26 +233,8 @@ class MBBANK:
         headers = {
         'Content-Type': 'application/json'
         }
-        response = requests.post(url, headers=headers, data=payload)
+        response = requests.post(url, headers=headers, data=payload, proxies=self.proxies, verify=False)
         return response.text
-
-    def checkProgressCaptcha(self, task_id):
-        url = 'https://api.anti-captcha.com/getTaskResult'
-        data = {
-            "clientKey": "f3a44e66302c61ffec07c80f4732baf3",
-            "taskId": task_id
-        }
-        headers = {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-        }
-        response = requests.post(url, headers=headers, data=json.dumps(data))
-        response_json = json.loads(response.text)
-        if response_json["status"] != "ready":
-            time.sleep(1)
-            return self.checkProgressCaptcha(task_id)
-        else:
-            return response_json["solution"]["text"]
 
     def getCaptcha(self):
         url = 'https://online.mbbank.com.vn/api/retail-web-internetbankingms/getCaptchaImage'
@@ -256,7 +247,7 @@ class MBBANK:
             "deviceIdCommon": self.device_id,
             "sessionId": ""
         }
-        response = requests.post(url, headers=headers, data=json.dumps(data))
+        response = requests.post(url, headers=headers, data=json.dumps(data), proxies=self.proxies, verify=False)
         response_json = json.loads(response.text)
         return response_json["imageString"]
 
@@ -325,8 +316,6 @@ class MBBANK:
         base64_captcha_img = self.getCaptcha()
         task = self.createTaskCaptcha(base64_captcha_img)
         captchaText =json.loads(task)['captcha']
-        # task = self.createTaskCaptcha1(base64_captcha_img)
-        # captchaText = self.checkProgressCaptcha(json.loads(task)['taskId'])
         session_raw = self.login(captchaText)
         
         
