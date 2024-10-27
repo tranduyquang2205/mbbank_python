@@ -24,28 +24,25 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 session_requests = get_legacy_session()
 
 class MBBANK:
-    def __init__(self,username, password, account_number, proxy_list=None):
+    def __init__(self,username, password, account_number,adb_device_id=None,smart_otp_pin=None, proxy_list=None):
         self.proxy_list = proxy_list
         if self.proxy_list:
-            try:
-                self.proxy_info = self.proxy_list.pop(0)
-                proxy_host, proxy_port, username_proxy, password_proxy = self.proxy_info.split(':')
-                self.proxies = {
-                    'http': f'http://{quote(username_proxy)}:{quote(password_proxy)}@{proxy_host}:{proxy_port}',
-                    'https': f'http://{quote(username_proxy)}:{quote(password_proxy)}@{proxy_host}:{proxy_port}'
-                }
-            except ValueError:
-                self.proxies = None 
-            except Exception as e:
-                self.proxies = None
+            self.proxy_info = self.proxy_list.pop(0)
+            proxy_host, proxy_port, username_proxy, password_proxy = self.proxy_info.split(':')
+            self.proxies = {
+                'http': f'socks5://{username_proxy}:{password_proxy}@{proxy_host}:{proxy_port}',
+                'https': f'socks5://{username_proxy}:{password_proxy}@{proxy_host}:{proxy_port}'
+            }
         else:
             self.proxies = None
         
         self.password = password
         self.username = username
         self.account_number = account_number
+        self.adb_device_id=adb_device_id
+        self.smart_otp_pin=smart_otp_pin
         self.is_login = False
-        self.file = f"data/{username}.txt"
+        self.file = f"db/users/{username}.txt"
         self.device_id = self.generate_device_id()
         self.session = requests.Session()
         
@@ -53,6 +50,7 @@ class MBBANK:
                     self.username = username
                     self.password = password
                     self.account_number = account_number
+                    self.adb_device_id = adb_device_id
                     self.sessionId = ""
                     self.mobileId = ""
                     self.clientId = ""
@@ -63,6 +61,8 @@ class MBBANK:
                     self.E = ""
                     self.tranId = ""
                     self.refNo = ""
+                    self.is_login = False
+                    self.time_login = time.time()
                     self.browserId = hashlib.md5(self.username.encode()).hexdigest()
                     self.save_data()
                     
@@ -71,6 +71,7 @@ class MBBANK:
             self.username = username
             self.password = password
             self.account_number = account_number
+            self.adb_device_id = adb_device_id
     def save_data(self):
         data = {
             'username': self.username,
@@ -86,6 +87,9 @@ class MBBANK:
             'browserToken': getattr(self, 'browserToken', ''),
             'browserId': self.browserId,
             'refNo': self.refNo,
+            'is_login':self.is_login,
+            'time_login': self.time_login,
+            'adb_device_id': self.adb_device_id,
         }
         with open(self.file, 'w') as f:
             json.dump(data, f)
@@ -109,6 +113,9 @@ class MBBANK:
         self.browserId = data.get('browserId', '')
         self.E = data.get('E', '')
         self.refNo = data.get('refNo', '')
+        self.is_login = data['is_login']
+        self.time_login = data['time_login']
+        self.adb_device_id = data['adb_device_id']
         
     def login(self, captchaText):
         url = 'https://online.mbbank.com.vn/api/retail_web/internetbanking/v2.0/doLogin'
@@ -128,11 +135,12 @@ class MBBANK:
             "captcha": captchaText,
             "ibAuthen2faString": "c7a1beebb9400375bb187daa33de9659",
             "sessionId": None,
-            "refNo": self.get_time_now(),
+            "refNo": self.generate_ref_no(),
             "deviceIdCommon": self.device_id,
         }
+        print(param)
         request_data = self.encrypt_data(param)
-        # print(request_data)
+        print(request_data)
         
         result = self.curlPost(url, headers=headers, data=(request_data))
         
@@ -173,7 +181,7 @@ class MBBANK:
                 result = response.text
             return result
     def encrypt_data(self,data):
-        url = "https://mbcrypt.pay2world.vip/encrypt"
+        url = "https://mbcrypt1.pay2world.vip/encrypt"
         payload = json.dumps(data)
         headers = {
         'Content-Type': 'application/json'
@@ -190,12 +198,16 @@ class MBBANK:
         return "s1rmi184-mbib-0000-0000-" + self.get_time_now()
     def get_time_now(self):
         return datetime.now().strftime("%Y%m%d%H%M%S") 
+    
+    def generate_ref_no(self):
+        return self.username +'-'+ self.get_time_now()+'-'+ str(random.randint(10000, 99999))
 
     def get_balance(self):
-        if not self.is_login:
+        if not self.is_login or time.time() - self.time_login > 900:
             login = self.handleLogin()
             if not login['success']:
                 return login
+
         url = 'https://online.mbbank.com.vn/api/retail-web-accountms/getBalance'
         headers = {
             'Authorization': 'Basic RU1CUkVUQUlMV0VCOlNEMjM0ZGZnMzQlI0BGR0AzNHNmc2RmNDU4NDNm',
@@ -243,7 +255,7 @@ class MBBANK:
             'Authorization': 'Basic RU1CUkVUQUlMV0VCOlNEMjM0ZGZnMzQlI0BGR0AzNHNmc2RmNDU4NDNm'
         }
         data = {
-            "refNo": self.get_time_now(),
+            "refNo": self.generate_ref_no(),
             "deviceIdCommon": self.device_id,
             "sessionId": ""
         }
@@ -287,38 +299,98 @@ class MBBANK:
                     "param":data,
                     "message": "Service Unavailable!"
                 }
-
-    def handleGetTransactionHistory(self, data):
-        self.insertToDB(data)
-        data_raw = json.dumps(data)
-        print(data_raw)
-        new_data = self.build_saveData(data)
-        with open("./data.json", "w") as f:
-            json.dump(new_data, f)
-
-    def insertToDB(self, data):
-        for value in data["transactionHistoryList"]:
-            description = value["description"].lower()
-            if "tbolach5" in description:
-                username = description.split('tbolach5 ')[1]
-                money = value["creditAmount"]
-                time_exchange = value["transactionDate"]
-                print(f"{username}-{money}-{time_exchange}")
-
-    def build_saveData(self, data):
-        new_data = {}
-        new_data["status"] = "done"
-        new_data["last_excute"] = int(time.time())
-        new_data["data"] = data
-        return new_data
-
     def handleLogin(self):
         base64_captcha_img = self.getCaptcha()
         task = self.createTaskCaptcha(base64_captcha_img)
         captchaText =json.loads(task)['captcha']
         session_raw = self.login(captchaText)
-        
-        
         return session_raw
-        
+    
+    def get_bank_name(self,ben_account_number, bank_code):
+        if not self.is_login or time.time() - self.time_login > 900:
+            login = self.handleLogin()
+            if not login['success']:
+                return login
+
+        url = 'https://online.mbbank.com.vn/api/retail_web/transfer/inquiryAccountName'
+        headers = {
+            'Authorization': 'Basic RU1CUkVUQUlMV0VCOlNEMjM0ZGZnMzQlI0BGR0AzNHNmc2RmNDU4NDNm',
+            'Content-Type': 'application/json'
+        }
+        data = {
+            "bankCode": bank_code,
+            "creditAccount": ben_account_number,
+            "creditAccountType": "ACCOUNT",
+            "debitAccount": self.account_number,
+            "deviceIdCommon": self.device_id,
+            "refNo": self.refNo,
+            "remark": "",
+            "sessionId": self.sessionId["sessionId"],
+            "type": "FAST"
+        }
+        response = self.curlPost(url, headers=headers, data=data)
+        if 'result' in response and 'responseCode' in response['result'] and response['result']['responseCode'] == "00" and 'benName' in response:
+            return response['benName']
+        else:
+            return None
+    def verify_make_transfer(self,bank_send, to_account, amount, description,account_name,logger):
+        if not self.is_login or time.time() - self.time_login > 900:
+            login = self.handleLogin()
+            if not login['success']:
+                return login
+
+        url = 'https://online.mbbank.com.vn/api/retail_web/transfer/verifyMakeTransfer'
+        headers = {
+            'Authorization': 'Basic RU1CUkVUQUlMV0VCOlNEMjM0ZGZnMzQlI0BGR0AzNHNmc2RmNDU4NDNm',
+            'Content-Type': 'application/json'
+        }
+        data = {
+            "amount": amount,
+            "benAccountName": account_name,
+            "benAccountNumber": to_account,
+            "benBankCd": bank_send['bankCode'],
+            "destType": "ACCOUNT",
+            "deviceIdCommon": self.device_id,
+            "message": description,
+            "refNo": self.refNo,
+            "sessionId": self.sessionId["sessionId"],
+            "srcAccountNumber": self.account_number,
+            "transferType": "FAST"
+        }
+        data = self.encrypt_data(data)
+        response = self.curlPost(url, headers=headers, data=data)
+        if 'result' in response and 'responseCode' in response['result'] and response['result']['responseCode'] == "00" and 'benName' in response:
+            return response['benName']
+        else:
+            return None
+    def verify_make_transfer(self,bank_send, to_account, amount, description,account_name,logger):
+        if not self.is_login or time.time() - self.time_login > 900:
+            login = self.handleLogin()
+            if not login['success']:
+                return login
+
+        url = 'https://online.mbbank.com.vn/api/retail_web/transfer/verifyMakeTransfer'
+        headers = {
+            'Authorization': 'Basic RU1CUkVUQUlMV0VCOlNEMjM0ZGZnMzQlI0BGR0AzNHNmc2RmNDU4NDNm',
+            'Content-Type': 'application/json'
+        }
+        data = {
+            "amount": amount,
+            "benAccountName": account_name,
+            "benAccountNumber": to_account,
+            "benBankCd": bank_send['bankCode'],
+            "destType": "ACCOUNT",
+            "deviceIdCommon": self.device_id,
+            "message": description,
+            "refNo": self.refNo,
+            "sessionId": self.sessionId["sessionId"],
+            "srcAccountNumber": self.account_number,
+            "transferType": "FAST"
+        }
+        data = self.encrypt_data(data)
+        response = self.curlPost(url, headers=headers, data=data)
+        if 'result' in response and 'responseCode' in response['result'] and response['result']['responseCode'] == "00" and 'benName' in response:
+            return response['benName']
+        else:
+            return None
 
