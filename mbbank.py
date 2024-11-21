@@ -6,17 +6,7 @@ import os
 import hashlib
 from datetime import datetime
 import random
-from Cryptodome.PublicKey import RSA
-from Cryptodome.Cipher import AES,PKCS1_v1_5,PKCS1_OAEP
-from Cryptodome.Random import get_random_bytes
-import base64
-import string
-from Cryptodome.Util import Counter
 from bypass_ssl_v3 import get_legacy_session
-from urllib.parse import quote
-import socket
-import urllib
-import ssl
 import urllib3
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
