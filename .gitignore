@@ -102,3 +102,4 @@ test.py
 data/*.txt
 data/*/*.txt
 db/*/*.txt
+db\*\*.txt
