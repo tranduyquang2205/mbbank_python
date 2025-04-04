@@ -109,15 +109,26 @@ class MBBANK:
         
     def login(self, captchaText):
         url = 'https://online.mbbank.com.vn/api/retail_web/internetbanking/v2.0/doLogin'
+        rId = self.generate_ref_no()
         headers = {
-            'Cache-Control': 'no-cache',
+            'Cache-Control': 'max-age=0',
             'Accept': 'application/json, text/plain, */*',
             'Authorization': 'Basic RU1CUkVUQUlMV0VCOlNEMjM0ZGZnMzQlI0BGR0AzNHNmc2RmNDU4NDNm',
-            'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+            'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
             "Origin": "https://online.mbbank.com.vn",
-            "Referer": "https://online.mbbank.com.vn/",
+            "Referer": "https://online.mbbank.com.vn/pl/login?returnUrl=%2F",
             "Content-Type": "application/json; charset=UTF-8",
             'app': "MB_WEB",
+            "X-Request-Id": rId,
+            "Deviceid": self.device_id,
+            "refNo": rId,
+            "elastic-apm-traceparent": "00-55b950e3fcabc785fa6db4d7deb5ef73-8dbd60b04eda2f34-01",
+            "Sec-Ch-Ua": '"Not.A/Brand";v="8", "Chromium";v="134", "Google Chrome";v="134"',
+            "Sec-Ch-Ua-Mobile": "?0",
+            "Sec-Ch-Ua-Platform": '"Windows"',
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "same-origin",
         }
         param = {
             "userId": self.username,
